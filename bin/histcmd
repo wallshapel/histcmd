@@ -1,0 +1,57 @@
+#!/usr/bin/env zsh
+
+set -u
+
+readonly HISTCMD_VERSION="0.1.0"
+
+_histcmd_init() {
+    local histmap="Histmap.toml"
+    local histfile="Histfile"
+
+    if [[ -e "$histmap" ]]; then
+        print -u2 -r -- "histcmd: $histmap already exists"
+        return 1
+    fi
+
+    if [[ -e "$histfile" ]]; then
+        print -u2 -r -- "histcmd: $histfile already exists"
+        return 1
+    fi
+
+    cat > "$histmap" <<'EOF'
+version = 1
+
+[[context]]
+path = "."
+recursive = false
+EOF
+
+    : > "$histfile"
+
+    print -r -- "Created $histmap"
+    print -r -- "Created $histfile"
+}
+
+case "${1:-}" in
+    init)
+        _histcmd_init
+        ;;
+
+    --version|-v)
+        print -r -- "histcmd $HISTCMD_VERSION"
+        ;;
+
+    --help|-h|"")
+        print -r -- "histcmd - contextual command history for Zsh"
+        print
+        print -r -- "Usage:"
+        print -r -- "  histcmd init"
+        print -r -- "  histcmd --version"
+        print -r -- "  histcmd --help"
+        ;;
+
+    *)
+        print -u2 -r -- "histcmd: unknown command: $1"
+        return 1 2>/dev/null || exit 1
+        ;;
+esac
