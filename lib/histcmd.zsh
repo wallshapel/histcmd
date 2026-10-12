@@ -159,7 +159,12 @@ _histcmd_update_history_context() {
     _histcmd_activate_context "$context"
 }
 
+_histcmd_on_exit() {
+    _histcmd_restore_global
+}
+
 autoload -U add-zsh-hook
 
 add-zsh-hook chpwd _histcmd_update_history_context
 add-zsh-hook precmd _histcmd_update_history_context
+add-zsh-hook zshexit _histcmd_on_exit
