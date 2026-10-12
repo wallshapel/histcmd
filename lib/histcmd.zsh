@@ -97,11 +97,72 @@ typeset -gi _HISTCMD_HISTORY_PUSHED=0
 typeset -gi _HISTCMD_HISTSIZE=10000
 typeset -gi _HISTCMD_SAVEHIST=10000
 
+typeset -gA _HISTCMD_SAVED_HISTORY_OPTIONS
+typeset -gi _HISTCMD_HISTORY_OPTIONS_SAVED=0
+
+_histcmd_save_history_options() {
+    (( _HISTCMD_HISTORY_OPTIONS_SAVED )) && return 0
+
+    local option
+
+    for option in \
+        APPEND_HISTORY \
+        SHARE_HISTORY \
+        INC_APPEND_HISTORY \
+        INC_APPEND_HISTORY_TIME \
+        HIST_IGNORE_ALL_DUPS \
+        HIST_SAVE_NO_DUPS \
+        HIST_EXPIRE_DUPS_FIRST \
+        HIST_REDUCE_BLANKS \
+        HIST_FIND_NO_DUPS \
+        HIST_FCNTL_LOCK
+    do
+        _HISTCMD_SAVED_HISTORY_OPTIONS[$option]="${options[$option]}"
+    done
+
+    _HISTCMD_HISTORY_OPTIONS_SAVED=1
+}
+
+_histcmd_apply_history_options() {
+    _histcmd_save_history_options
+
+    setopt APPEND_HISTORY
+    unsetopt SHARE_HISTORY
+    unsetopt INC_APPEND_HISTORY
+    unsetopt INC_APPEND_HISTORY_TIME
+
+    setopt HIST_IGNORE_ALL_DUPS
+    setopt HIST_SAVE_NO_DUPS
+    setopt HIST_EXPIRE_DUPS_FIRST
+    setopt HIST_REDUCE_BLANKS
+    setopt HIST_FIND_NO_DUPS
+    setopt HIST_FCNTL_LOCK
+}
+
+_histcmd_restore_history_options() {
+    (( _HISTCMD_HISTORY_OPTIONS_SAVED )) || return 0
+
+    local option
+
+    for option in ${(k)_HISTCMD_SAVED_HISTORY_OPTIONS}; do
+        if [[ "${_HISTCMD_SAVED_HISTORY_OPTIONS[$option]}" == "on" ]]; then
+            setopt "$option"
+        else
+            unsetopt "$option"
+        fi
+    done
+
+    _HISTCMD_SAVED_HISTORY_OPTIONS=()
+    _HISTCMD_HISTORY_OPTIONS_SAVED=0
+}
+
 _histcmd_restore_global() {
     if (( _HISTCMD_HISTORY_PUSHED )); then
         fc -P
         _HISTCMD_HISTORY_PUSHED=0
     fi
+
+    _histcmd_restore_history_options
 
     _HISTCMD_MODE="global"
     _HISTCMD_ACTIVE_CONTEXT=""
@@ -121,6 +182,8 @@ _histcmd_activate_context() {
         fc -P
     fi
 
+    _histcmd_apply_history_options
+
     fc -p "$histfile" "$_HISTCMD_HISTSIZE" "$_HISTCMD_SAVEHIST"
     fc -RI "$histfile"
 
@@ -137,6 +200,8 @@ _histcmd_activate_empty() {
     if (( _HISTCMD_HISTORY_PUSHED )); then
         fc -P
     fi
+
+    _histcmd_restore_history_options
 
     fc -p
 

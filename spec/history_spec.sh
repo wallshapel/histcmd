@@ -57,4 +57,28 @@ Describe 'histcmd history persistence'
     The status should be success
   End
 
+  It 'applies and restores contextual history options'
+    check_history_options() {
+      setopt SHARE_HISTORY
+      unsetopt HIST_SAVE_NO_DUPS
+      unsetopt HIST_FCNTL_LOCK
+
+      _histcmd_apply_history_options || return 1
+
+      [[ ! -o SHARE_HISTORY ]] || return 2
+      [[ -o HIST_SAVE_NO_DUPS ]] || return 3
+      [[ -o HIST_FCNTL_LOCK ]] || return 4
+
+      _histcmd_restore_history_options || return 5
+
+      [[ -o SHARE_HISTORY ]] || return 6
+      [[ ! -o HIST_SAVE_NO_DUPS ]] || return 7
+      [[ ! -o HIST_FCNTL_LOCK ]] || return 8
+    }
+
+    When call check_history_options
+
+    The status should be success
+  End
+
 End
