@@ -11,13 +11,13 @@ Describe 'histcmd context resolution'
       "$TEST_WORKSPACE/1. Recorrido intensivo por C++ y su biblioteca estándar/ejercicios"
 
     touch \
-      "$TEST_WORKSPACE/Histfile" \
-      "$TEST_WORKSPACE/backend/Histfile" \
-      "$TEST_WORKSPACE/frontend/Histfile" \
-      "$TEST_WORKSPACE/frontend/frontend-1/Histfile" \
-      "$TEST_WORKSPACE/1. Recorrido intensivo por C++ y su biblioteca estándar/Histfile"
+      "$TEST_WORKSPACE/histfile" \
+      "$TEST_WORKSPACE/backend/histfile" \
+      "$TEST_WORKSPACE/frontend/histfile" \
+      "$TEST_WORKSPACE/frontend/frontend-1/histfile" \
+      "$TEST_WORKSPACE/1. Recorrido intensivo por C++ y su biblioteca estándar/histfile"
 
-    cat > "$TEST_WORKSPACE/Histmap.toml" <<'EOF'
+    cat > "$TEST_WORKSPACE/histmap.toml" <<'EOF'
 version = 1
 
 [[context]]

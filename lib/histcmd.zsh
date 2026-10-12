@@ -4,7 +4,7 @@ _histcmd_find_workspace() {
     local directory="${PWD:A}"
 
     while true; do
-        if [[ -f "$directory/Histmap.toml" ]]; then
+        if [[ -f "$directory/histmap.toml" ]]; then
             print -r -- "$directory"
             return 0
         fi
@@ -22,7 +22,7 @@ _histcmd_resolve_context() {
     local workspace
     workspace="$(_histcmd_find_workspace)" || return 1
 
-    local histmap="$workspace/Histmap.toml"
+    local histmap="$workspace/histmap.toml"
     local current_directory="${PWD:A}"
 
     local header_re='^[[:space:]]*\[\[context\]\][[:space:]]*$'
@@ -170,7 +170,7 @@ _histcmd_restore_global() {
 
 _histcmd_activate_context() {
     local context="$1"
-    local histfile="$context/Histfile"
+    local histfile="$context/histfile"
 
     [[ -f "$histfile" ]] || return 1
 

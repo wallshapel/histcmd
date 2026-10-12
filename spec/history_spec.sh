@@ -4,7 +4,7 @@ Describe 'histcmd history persistence'
   setup_history() {
     PROJECT_ROOT="$PWD"
     TEST_DIRECTORY="$(mktemp -d)"
-    TEST_HISTFILE="$TEST_DIRECTORY/Histfile"
+    TEST_HISTFILE="$TEST_DIRECTORY/histfile"
 
     touch "$TEST_HISTFILE"
   }

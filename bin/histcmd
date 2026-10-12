@@ -5,8 +5,8 @@ set -u
 readonly HISTCMD_VERSION="2.0.0"
 
 _histcmd_init() {
-    local histmap="Histmap.toml"
-    local histfile="Histfile"
+    local histmap="histmap.toml"
+    local histfile="histfile"
 
     if [[ -e "$histmap" ]]; then
         print -u2 -r -- "histcmd: $histmap already exists"
@@ -32,9 +32,144 @@ EOF
     print -r -- "Created $histfile"
 }
 
+_histcmd_build() {
+    local histmap="histmap.toml"
+
+    if [[ ! -f "$histmap" ]]; then
+        print -u2 -r -- "histcmd: histmap.toml not found"
+        return 1
+    fi
+
+    local header_re='^[[:space:]]*\[\[context\]\][[:space:]]*$'
+    local version_re='^[[:space:]]*version[[:space:]]*=[[:space:]]*1[[:space:]]*$'
+    local path_re='^[[:space:]]*path[[:space:]]*=[[:space:]]*"([^"]*)"[[:space:]]*$'
+    local recursive_re='^[[:space:]]*recursive[[:space:]]*=[[:space:]]*(true|false)[[:space:]]*$'
+
+    local -a context_paths
+    local current_path=""
+    local current_recursive=""
+    local line
+    local line_number=0
+    local version_found=0
+    local inside_context=0
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        (( line_number++ ))
+
+        [[ -z "${line//[[:space:]]/}" ]] && continue
+        [[ "$line" == [[:space:]]\#* ]] && continue
+
+        if [[ "$line" =~ "$version_re" ]]; then
+            if (( version_found )); then
+                print -u2 -r -- "histcmd: duplicate version at line $line_number"
+                return 1
+            fi
+
+            version_found=1
+            continue
+        fi
+
+        if [[ "$line" =~ "$header_re" ]]; then
+            if (( inside_context )); then
+                if [[ -z "$current_path" || -z "$current_recursive" ]]; then
+                    print -u2 -r -- "histcmd: incomplete context before line $line_number"
+                    return 1
+                fi
+
+                context_paths+=("$current_path")
+            fi
+
+            current_path=""
+            current_recursive=""
+            inside_context=1
+            continue
+        fi
+
+        if (( inside_context )) && [[ "$line" =~ "$path_re" ]]; then
+            if [[ -n "$current_path" ]]; then
+                print -u2 -r -- "histcmd: duplicate path at line $line_number"
+                return 1
+            fi
+
+            current_path="$match[1]"
+            continue
+        fi
+
+        if (( inside_context )) && [[ "$line" =~ "$recursive_re" ]]; then
+            if [[ -n "$current_recursive" ]]; then
+                print -u2 -r -- "histcmd: duplicate recursive at line $line_number"
+                return 1
+            fi
+
+            current_recursive="$match[1]"
+            continue
+        fi
+
+        print -u2 -r -- "histcmd: invalid syntax at line $line_number"
+        return 1
+    done < "$histmap"
+
+    if (( inside_context )); then
+        if [[ -z "$current_path" || -z "$current_recursive" ]]; then
+            print -u2 -r -- "histcmd: incomplete context at end of file"
+            return 1
+        fi
+
+        context_paths+=("$current_path")
+    fi
+
+    if (( ! version_found )); then
+        print -u2 -r -- "histcmd: version = 1 is required"
+        return 1
+    fi
+
+    if (( ${#context_paths[@]} == 0 )); then
+        print -u2 -r -- "histcmd: no contexts defined"
+        return 1
+    fi
+
+    local workspace="${PWD:A}"
+    local -a targets
+    local context_path
+    local target
+
+    for context_path in "${context_paths[@]}"; do
+        target="${workspace}/${context_path}"
+        target="${target:A}"
+
+        if [[ "$target" != "$workspace" && "$target" != "$workspace"/* ]]; then
+            print -u2 -r -- "histcmd: context escapes workspace: $context_path"
+            return 1
+        fi
+
+        if [[ ! -d "$target" ]]; then
+            print -u2 -r -- "histcmd: context directory does not exist: $context_path"
+            return 1
+        fi
+
+        targets+=("$target")
+    done
+
+    for target in "${targets[@]}"; do
+        if [[ ! -e "$target/histfile" ]]; then
+            : > "$target/histfile"
+
+            if [[ "$target" == "$workspace" ]]; then
+                print -r -- "Created histfile"
+            else
+                print -r -- "Created ${target#$workspace/}/histfile"
+            fi
+        fi
+    done
+}
+
 case "${1:-}" in
     init)
         _histcmd_init
+        ;;
+
+    build)
+        _histcmd_build
         ;;
 
     --version|-v)
@@ -46,6 +181,7 @@ case "${1:-}" in
         print
         print -r -- "Usage:"
         print -r -- "  histcmd init"
+        print -r -- "  histcmd build"
         print -r -- "  histcmd --version"
         print -r -- "  histcmd --help"
         ;;
