@@ -23,36 +23,65 @@ zsh --version
 
 ## 📦 Instalación
 
-### 1. Clona el proyecto
+### ⚡ Instalación automática
+
+Clona el proyecto:
+
+```bash
+git clone https://github.com/wallshapel/histcmd.git
+cd histcmd
+```
+
+Ejecuta el instalador:
+
+```bash
+./install.sh
+```
+
+El instalador se encarga automáticamente de:
+
+- 📁 instalar `histcmd` en `~/.local/share/histcmd`
+- 🔗 crear el comando `histcmd` en `~/.local/bin`
+- 🛣️ agregar `~/.local/bin` al `PATH` si hace falta
+- 🐚 integrar `histcmd` con Zsh mediante `~/.zshrc`
+- ♻️ actualizar una instalación existente si vuelves a ejecutarlo
+- 🧹 evitar líneas duplicadas en `~/.zshrc`
+
+Después abre una terminal nueva o ejecuta:
+
+```bash
+exec zsh
+```
+
+Comprueba la instalación:
+
+```bash
+histcmd --version
+```
+
+### 🔧 Instalación manual
+
+Si prefieres instalarlo manualmente:
 
 ```bash
 git clone https://github.com/wallshapel/histcmd.git ~/.local/share/histcmd
-```
-
-### 2. Haz disponible el comando `histcmd`
-
-```bash
 mkdir -p ~/.local/bin
 ln -s ~/.local/share/histcmd/bin/histcmd ~/.local/bin/histcmd
 ```
 
-Asegúrate de tener `~/.local/bin` en tu `PATH`.
-
-Por ejemplo, en `~/.zshrc`:
+Asegúrate de tener `~/.local/bin` en tu `PATH`:
 
 ```zsh
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-### 3. Activa histcmd en Zsh
-
-Agrega al final de `~/.zshrc`:
+Y agrega al final de `~/.zshrc`:
 
 ```zsh
 source "$HOME/.local/share/histcmd/lib/histcmd.zsh"
 ```
 
-Recarga Zsh:
+Después:
 
 ```bash
 exec zsh
