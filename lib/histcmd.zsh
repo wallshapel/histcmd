@@ -120,6 +120,7 @@ _histcmd_activate_context() {
     fi
 
     fc -p "$histfile"
+    fc -RI "$histfile"
 
     _HISTCMD_HISTORY_PUSHED=1
     _HISTCMD_MODE="context"

@@ -1,4 +1,5 @@
 Describe 'histcmd history persistence'
+  Include lib/histcmd.zsh
 
   setup_history() {
     PROJECT_ROOT="$PWD"
@@ -41,4 +42,19 @@ Describe 'histcmd history persistence'
     The output should include 'echo persisted-context-command'
     The status should be success
   End
+
+  It 'loads existing history when activating a context'
+    FC_LOG="$TEST_DIRECTORY/fc.log"
+
+    fc() {
+      print -r -- "$*" >> "$FC_LOG"
+    }
+
+    When call _histcmd_activate_context "$TEST_DIRECTORY"
+
+    The contents of file "$FC_LOG" should include "-p $TEST_HISTFILE"
+    The contents of file "$FC_LOG" should include "-RI $TEST_HISTFILE"
+    The status should be success
+  End
+
 End
