@@ -94,6 +94,8 @@ _histcmd_resolve_context() {
 typeset -g _HISTCMD_MODE="global"
 typeset -g _HISTCMD_ACTIVE_CONTEXT=""
 typeset -gi _HISTCMD_HISTORY_PUSHED=0
+typeset -gi _HISTCMD_HISTSIZE=10000
+typeset -gi _HISTCMD_SAVEHIST=10000
 
 _histcmd_restore_global() {
     if (( _HISTCMD_HISTORY_PUSHED )); then
@@ -119,7 +121,7 @@ _histcmd_activate_context() {
         fc -P
     fi
 
-    fc -p "$histfile"
+    fc -p "$histfile" "$_HISTCMD_HISTSIZE" "$_HISTCMD_SAVEHIST"
     fc -RI "$histfile"
 
     _HISTCMD_HISTORY_PUSHED=1
