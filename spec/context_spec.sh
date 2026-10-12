@@ -74,12 +74,16 @@ EOF
     The status should be success
   End
 
-  It 'returns no context for an unmanaged directory'
+  It 'creates a context automatically for an unmanaged directory'
     cd "$TEST_WORKSPACE/docs"
 
     When call _histcmd_resolve_context
-    The output should be blank
-    The status should be failure
+
+    The output should equal "$TEST_WORKSPACE/docs"
+    The path "$TEST_WORKSPACE/docs/histfile" should be file
+    The contents of file "$TEST_WORKSPACE/histmap.toml" should include 'path = "docs"'
+    The contents of file "$TEST_WORKSPACE/histmap.toml" should include 'recursive = true'
+    The status should be success
   End
 
   It 'prefers the most specific nested context'
@@ -97,4 +101,15 @@ EOF
     The output should equal "$TEST_WORKSPACE/1. Recorrido intensivo por C++ y su biblioteca estándar"
     The status should be success
   End
+
+  It 'does not create a child context when a recursive parent already applies'
+    cd "$TEST_WORKSPACE/backend/src"
+
+    When call _histcmd_resolve_context
+
+    The output should equal "$TEST_WORKSPACE/backend"
+    The path "$TEST_WORKSPACE/backend/src/histfile" should not be exist
+    The status should be success
+  End
+
 End

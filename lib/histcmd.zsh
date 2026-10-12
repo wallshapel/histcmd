@@ -210,6 +210,36 @@ _histcmd_activate_empty() {
     _HISTCMD_ACTIVE_CONTEXT=""
 }
 
+_histcmd_create_context() {
+    local workspace="$1"
+    local current_directory="${PWD:A}"
+    local relative_path
+    local histmap="$workspace/histmap.toml"
+    local histfile="$current_directory/histfile"
+
+    if [[ "$current_directory" == "$workspace" ]]; then
+        relative_path="."
+    else
+        relative_path="${current_directory#$workspace/}"
+    fi
+
+    if [[ "$relative_path" == *\"* || "$relative_path" == *$'\n'* ]]; then
+        print -u2 -r -- "histcmd: unsupported context path: $relative_path"
+        return 1
+    fi
+
+    cat >> "$histmap" <<EOF
+
+[[context]]
+path = "$relative_path"
+recursive = true
+EOF
+
+    : > "$histfile"
+
+    _histcmd_activate_context "$current_directory"
+}
+
 _histcmd_update_history_context() {
     local workspace
     local context
@@ -220,9 +250,16 @@ _histcmd_update_history_context() {
     }
 
     context="$(_histcmd_resolve_context)" || {
-        _histcmd_activate_empty
-        return 0
+        _histcmd_create_context "$workspace"
+        return $?
     }
+
+    if [[ ! -e "$context/histfile" ]]; then
+        : > "$context/histfile"
+    elif [[ ! -f "$context/histfile" ]]; then
+        print -u2 -r -- "histcmd: context histfile is not a regular file: $context/histfile"
+        return 1
+    fi
 
     _histcmd_activate_context "$context"
 }
