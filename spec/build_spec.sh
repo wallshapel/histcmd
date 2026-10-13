@@ -92,4 +92,32 @@ EOF
     The status should be failure
   End
 
+  It 'accepts include-parent in a valid context'
+    mkdir -p "$TEST_WORKSPACE/parent/child"
+
+    cat > "$TEST_WORKSPACE/histmap.toml" <<'EOF'
+version = 1
+
+[[context]]
+path = "parent"
+recursive = true
+
+[[context]]
+path = "parent/child"
+recursive = true
+include-parent = true
+EOF
+
+    cd "$TEST_WORKSPACE"
+
+    When run command zsh "$PROJECT_ROOT/bin/histcmd" build
+
+    The output should include 'Created parent/histfile'
+    The output should include 'Created parent/child/histfile'
+
+    The path "$TEST_WORKSPACE/parent/histfile" should be file
+    The path "$TEST_WORKSPACE/parent/child/histfile" should be file
+    The status should be success
+  End
+
 End

@@ -81,4 +81,77 @@ Describe 'histcmd history persistence'
     The status should be success
   End
 
+  It 'routes merged history writes to the child histfile'
+    CHILD_DIRECTORY="$TEST_DIRECTORY/child"
+    CHILD_HISTFILE="$CHILD_DIRECTORY/histfile"
+    FC_LOG="$TEST_DIRECTORY/fc.log"
+
+    mkdir -p "$CHILD_DIRECTORY"
+    touch "$CHILD_HISTFILE"
+
+    fc() {
+      print -r -- "$*" >> "$FC_LOG"
+    }
+
+    _HISTCMD_MERGED_HISTORY=1
+    _HISTCMD_WRITE_HISTFILE="$CHILD_HISTFILE"
+
+    When call _histcmd_route_merged_history $'echo CHILD-NEW\n'
+
+    The contents of file "$FC_LOG" should include "-p $CHILD_HISTFILE"
+    The contents of file "$FC_LOG" should include "-RI $CHILD_HISTFILE"
+    The contents of file "$FC_LOG" should not include "$TEST_HISTFILE"
+    The status should be success
+  End  
+
+  It 'loads parent history before child history'
+    CHILD_DIRECTORY="$TEST_DIRECTORY/child"
+    CHILD_HISTFILE="$CHILD_DIRECTORY/histfile"
+    FC_LOG="$TEST_DIRECTORY/fc.log"
+
+    mkdir -p "$CHILD_DIRECTORY"
+    touch "$CHILD_HISTFILE"
+
+    fc() {
+      print -r -- "$*" >> "$FC_LOG"
+    }
+
+    check_parent_load_order() {
+      _HISTCMD_HISTORY_PUSHED=0
+      _HISTCMD_MERGED_HISTORY=0
+      _HISTCMD_WRITE_HISTFILE=""
+      _HISTCMD_MODE="global"
+      _HISTCMD_ACTIVE_CONTEXT=""
+
+      _histcmd_activate_context_with_parent \
+        "$CHILD_DIRECTORY" \
+        "$TEST_DIRECTORY" || return 1
+
+      local parent_line
+      local child_line
+
+      parent_line="$(
+        grep -nF -- "-RI $TEST_HISTFILE" "$FC_LOG" |
+          head -n 1 |
+          cut -d: -f1
+      )"
+
+      child_line="$(
+        grep -nF -- "-RI $CHILD_HISTFILE" "$FC_LOG" |
+          head -n 1 |
+          cut -d: -f1
+      )"
+
+      [[ -n "$parent_line" && -n "$child_line" ]] || return 2
+      (( parent_line < child_line )) || return 3
+
+      [[ "$_HISTCMD_WRITE_HISTFILE" == "$CHILD_HISTFILE" ]] || return 4
+      (( _HISTCMD_MERGED_HISTORY == 1 )) || return 5
+    }
+
+    When call check_parent_load_order
+
+    The status should be success
+  End    
+
 End

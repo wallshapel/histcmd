@@ -44,10 +44,12 @@ _histcmd_build() {
     local version_re='^[[:space:]]*version[[:space:]]*=[[:space:]]*1[[:space:]]*$'
     local path_re='^[[:space:]]*path[[:space:]]*=[[:space:]]*"([^"]*)"[[:space:]]*$'
     local recursive_re='^[[:space:]]*recursive[[:space:]]*=[[:space:]]*(true|false)[[:space:]]*$'
+    local include_parent_re='^[[:space:]]*include-parent[[:space:]]*=[[:space:]]*(true|false)[[:space:]]*$'
 
     local -a context_paths
     local current_path=""
     local current_recursive=""
+    local current_include_parent=""
     local line
     local line_number=0
     local version_found=0
@@ -81,6 +83,7 @@ _histcmd_build() {
 
             current_path=""
             current_recursive=""
+            current_include_parent=""
             inside_context=1
             continue
         fi
@@ -102,6 +105,16 @@ _histcmd_build() {
             fi
 
             current_recursive="$match[1]"
+            continue
+        fi
+
+        if (( inside_context )) && [[ "$line" =~ "$include_parent_re" ]]; then
+            if [[ -n "$current_include_parent" ]]; then
+                print -u2 -r -- "histcmd: duplicate include-parent at line $line_number"
+                return 1
+            fi
+
+            current_include_parent="$match[1]"
             continue
         fi
 
