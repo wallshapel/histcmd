@@ -28,12 +28,15 @@ _histcmd_resolve_context() {
     local header_re='^[[:space:]]*\[\[context\]\][[:space:]]*$'
     local path_re='^[[:space:]]*path[[:space:]]*=[[:space:]]*"([^"]*)"[[:space:]]*$'
     local recursive_re='^[[:space:]]*recursive[[:space:]]*=[[:space:]]*(true|false)[[:space:]]*$'
+    local include_parent_re='^[[:space:]]*include-parent[[:space:]]*=[[:space:]]*(true|false)[[:space:]]*$'
 
     local -a paths
     local -a recursive_flags
+    local -a include_parent_flags
 
     local context_path=""
     local context_recursive="false"
+    local context_include_parent="false"
     local line
 
     while IFS= read -r line || [[ -n "$line" ]]; do
@@ -41,22 +44,28 @@ _histcmd_resolve_context() {
             if [[ -n "$context_path" ]]; then
                 paths+=("$context_path")
                 recursive_flags+=("$context_recursive")
+                include_parent_flags+=("$context_include_parent")
             fi
 
             context_path=""
             context_recursive="false"
+            context_include_parent="false"
 
         elif [[ "$line" =~ "$path_re" ]]; then
             context_path="$match[1]"
 
         elif [[ "$line" =~ "$recursive_re" ]]; then
             context_recursive="$match[1]"
+
+        elif [[ "$line" =~ "$include_parent_re" ]]; then
+            context_include_parent="$match[1]"
         fi
     done < "$histmap"
 
     if [[ -n "$context_path" ]]; then
         paths+=("$context_path")
         recursive_flags+=("$context_recursive")
+        include_parent_flags+=("$context_include_parent")
     fi
 
     local best_context=""
@@ -89,6 +98,99 @@ _histcmd_resolve_context() {
     [[ -n "$best_context" ]] || return 1
 
     print -r -- "$best_context"
+}
+
+_histcmd_context_includes_parent() {
+    emulate -L zsh
+
+    local context="$1"
+    local workspace
+    workspace="$(_histcmd_find_workspace)" || return 1
+
+    local histmap="$workspace/histmap.toml"
+
+    local header_re='^[[:space:]]*\[\[context\]\][[:space:]]*$'
+    local path_re='^[[:space:]]*path[[:space:]]*=[[:space:]]*"([^"]*)"[[:space:]]*$'
+    local include_parent_re='^[[:space:]]*include-parent[[:space:]]*=[[:space:]]*(true|false)[[:space:]]*$'
+
+    local context_path=""
+    local context_include_parent="false"
+    local line
+    local candidate
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        if [[ "$line" =~ "$header_re" ]]; then
+            if [[ -n "$context_path" ]]; then
+                candidate="${workspace}/${context_path}"
+                candidate="${candidate:A}"
+
+                if [[ "$candidate" == "$context" ]]; then
+                    [[ "$context_include_parent" == "true" ]]
+                    return
+                fi
+            fi
+
+            context_path=""
+            context_include_parent="false"
+
+        elif [[ "$line" =~ "$path_re" ]]; then
+            context_path="$match[1]"
+
+        elif [[ "$line" =~ "$include_parent_re" ]]; then
+            context_include_parent="$match[1]"
+        fi
+    done < "$histmap"
+
+    if [[ -n "$context_path" ]]; then
+        candidate="${workspace}/${context_path}"
+        candidate="${candidate:A}"
+
+        if [[ "$candidate" == "$context" ]]; then
+            [[ "$context_include_parent" == "true" ]]
+            return
+        fi
+    fi
+
+    return 1
+}
+
+_histcmd_find_parent_context() {
+    emulate -L zsh
+
+    local context="$1"
+    local workspace
+    workspace="$(_histcmd_find_workspace)" || return 1
+
+    local histmap="$workspace/histmap.toml"
+
+    local path_re='^[[:space:]]*path[[:space:]]*=[[:space:]]*"([^"]*)"[[:space:]]*$'
+
+    local best_parent=""
+    local best_length=-1
+    local line
+    local candidate
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        if [[ "$line" =~ "$path_re" ]]; then
+            candidate="${workspace}/${match[1]}"
+            candidate="${candidate:A}"
+
+            if [[ "$candidate" == "$context" ]]; then
+                continue
+            fi
+
+            if [[ "$context" == "$candidate"/* ]]; then
+                if (( ${#candidate} > best_length )); then
+                    best_parent="$candidate"
+                    best_length=${#candidate}
+                fi
+            fi
+        fi
+    done < "$histmap"
+
+    [[ -n "$best_parent" ]] || return 1
+
+    print -r -- "$best_parent"
 }
 
 typeset -g _HISTCMD_MODE="global"

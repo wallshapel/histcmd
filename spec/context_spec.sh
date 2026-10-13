@@ -35,6 +35,7 @@ recursive = true
 [[context]]
 path = "frontend/frontend-1"
 recursive = true
+include-parent = true
 
 [[context]]
 path = "1. Recorrido intensivo por C++ y su biblioteca estándar"
@@ -109,6 +110,27 @@ EOF
 
     The output should equal "$TEST_WORKSPACE/backend"
     The path "$TEST_WORKSPACE/backend/src/histfile" should not be exist
+    The status should be success
+  End
+
+  It 'detects include-parent on a context'
+    cd "$TEST_WORKSPACE/frontend/frontend-1/src"
+
+    context="$(_histcmd_resolve_context)"
+
+    When call _histcmd_context_includes_parent "$context"
+
+    The status should be success
+  End
+
+  It 'finds the immediate configured parent context'
+    cd "$TEST_WORKSPACE/frontend/frontend-1/src"
+
+    context="$(_histcmd_resolve_context)"
+
+    When call _histcmd_find_parent_context "$context"
+
+    The output should equal "$TEST_WORKSPACE/frontend"
     The status should be success
   End
 
