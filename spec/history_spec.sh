@@ -152,6 +152,66 @@ Describe 'histcmd history persistence'
     When call check_parent_load_order
 
     The status should be success
+  End
+
+  It 'loads all ancestor histories before the active context'
+    BACKEND_DIRECTORY="$TEST_DIRECTORY/backend"
+    API_DIRECTORY="$BACKEND_DIRECTORY/api"
+    BACKEND_HISTFILE="$BACKEND_DIRECTORY/histfile"
+    API_HISTFILE="$API_DIRECTORY/histfile"
+    FC_LOG="$TEST_DIRECTORY/fc.log"
+
+    mkdir -p "$API_DIRECTORY"
+    touch "$BACKEND_HISTFILE" "$API_HISTFILE"
+
+    fc() {
+      print -r -- "$*" >> "$FC_LOG"
+    }
+
+    check_ancestor_load_order() {
+      _HISTCMD_HISTORY_PUSHED=0
+      _HISTCMD_MERGED_HISTORY=0
+      _HISTCMD_WRITE_HISTFILE=""
+      _HISTCMD_MODE="global"
+      _HISTCMD_ACTIVE_CONTEXT=""
+
+      _histcmd_activate_context_with_sources \
+        "$API_DIRECTORY" \
+        "$TEST_DIRECTORY" \
+        "$BACKEND_DIRECTORY" || return 1
+
+      local root_line
+      local backend_line
+      local api_line
+
+      root_line="$(
+        grep -nF -- "-RI $TEST_HISTFILE" "$FC_LOG" |
+          head -n 1 |
+          cut -d: -f1
+      )"
+
+      backend_line="$(
+        grep -nF -- "-RI $BACKEND_HISTFILE" "$FC_LOG" |
+          head -n 1 |
+          cut -d: -f1
+      )"
+
+      api_line="$(
+        grep -nF -- "-RI $API_HISTFILE" "$FC_LOG" |
+          head -n 1 |
+          cut -d: -f1
+      )"
+
+      [[ -n "$root_line" && -n "$backend_line" && -n "$api_line" ]] || return 2
+      (( root_line < backend_line && backend_line < api_line )) || return 3
+
+      [[ "$_HISTCMD_WRITE_HISTFILE" == "$API_HISTFILE" ]] || return 4
+      (( _HISTCMD_MERGED_HISTORY == 1 )) || return 5
+    }
+
+    When call check_ancestor_load_order
+
+    The status should be success
   End    
 
 End

@@ -100,10 +100,14 @@ _histcmd_resolve_context() {
     print -r -- "$best_context"
 }
 
-_histcmd_context_includes_parent() {
+_histcmd_context_flag_enabled() {
     emulate -L zsh
 
     local context="$1"
+    local flag="$2"
+
+    [[ "$flag" == "include-parent" || "$flag" == "include-ancestors" ]] || return 1
+
     local workspace
     workspace="$(_histcmd_find_workspace)" || return 1
 
@@ -111,10 +115,10 @@ _histcmd_context_includes_parent() {
 
     local header_re='^[[:space:]]*\[\[context\]\][[:space:]]*$'
     local path_re='^[[:space:]]*path[[:space:]]*=[[:space:]]*"([^"]*)"[[:space:]]*$'
-    local include_parent_re='^[[:space:]]*include-parent[[:space:]]*=[[:space:]]*(true|false)[[:space:]]*$'
+    local flag_re="^[[:space:]]*${flag}[[:space:]]*=[[:space:]]*(true|false)[[:space:]]*$"
 
     local context_path=""
-    local context_include_parent="false"
+    local context_flag="false"
     local line
     local candidate
 
@@ -125,19 +129,19 @@ _histcmd_context_includes_parent() {
                 candidate="${candidate:A}"
 
                 if [[ "$candidate" == "$context" ]]; then
-                    [[ "$context_include_parent" == "true" ]]
+                    [[ "$context_flag" == "true" ]]
                     return
                 fi
             fi
 
             context_path=""
-            context_include_parent="false"
+            context_flag="false"
 
         elif [[ "$line" =~ "$path_re" ]]; then
             context_path="$match[1]"
 
-        elif [[ "$line" =~ "$include_parent_re" ]]; then
-            context_include_parent="$match[1]"
+        elif [[ "$line" =~ "$flag_re" ]]; then
+            context_flag="$match[1]"
         fi
     done < "$histmap"
 
@@ -146,12 +150,20 @@ _histcmd_context_includes_parent() {
         candidate="${candidate:A}"
 
         if [[ "$candidate" == "$context" ]]; then
-            [[ "$context_include_parent" == "true" ]]
+            [[ "$context_flag" == "true" ]]
             return
         fi
     fi
 
     return 1
+}
+
+_histcmd_context_includes_parent() {
+    _histcmd_context_flag_enabled "$1" "include-parent"
+}
+
+_histcmd_context_includes_ancestors() {
+    _histcmd_context_flag_enabled "$1" "include-ancestors"
 }
 
 _histcmd_find_parent_context() {
@@ -191,6 +203,24 @@ _histcmd_find_parent_context() {
     [[ -n "$best_parent" ]] || return 1
 
     print -r -- "$best_parent"
+}
+
+_histcmd_find_ancestor_contexts() {
+    emulate -L zsh
+
+    local context="$1"
+    local current="$context"
+    local parent
+    local -a ancestors
+
+    while parent="$(_histcmd_find_parent_context "$current")"; do
+        ancestors=("$parent" "${ancestors[@]}")
+        current="$parent"
+    done
+
+    (( ${#ancestors[@]} > 0 )) || return 1
+
+    printf '%s\n' "${ancestors[@]}"
 }
 
 typeset -g _HISTCMD_MODE="global"
@@ -324,21 +354,30 @@ _histcmd_activate_context() {
     _HISTCMD_ACTIVE_CONTEXT="$context"
 }
 
-_histcmd_activate_context_with_parent() {
+_histcmd_activate_context_with_sources() {
     local context="$1"
-    local parent="$2"
+    shift
 
+    local -a source_contexts=("$@")
     local histfile="$context/histfile"
-    local parent_histfile="$parent/histfile"
+    local source_context
+    local source_histfile
 
     [[ -f "$histfile" ]] || return 1
+    (( ${#source_contexts[@]} > 0 )) || return 1
 
-    if [[ ! -e "$parent_histfile" ]]; then
-        : > "$parent_histfile"
-    elif [[ ! -f "$parent_histfile" ]]; then
-        print -u2 -r -- "histcmd: parent histfile is not a regular file: $parent_histfile"
-        return 1
-    fi
+    for source_context in "${source_contexts[@]}"; do
+        [[ "$source_context" == "$context" ]] && continue
+
+        source_histfile="$source_context/histfile"
+
+        if [[ ! -e "$source_histfile" ]]; then
+            : > "$source_histfile" || return 1
+        elif [[ ! -f "$source_histfile" ]]; then
+            print -u2 -r -- "histcmd: source histfile is not a regular file: $source_histfile"
+            return 1
+        fi
+    done
 
     if [[
         "$_HISTCMD_MODE" == "context"
@@ -356,7 +395,12 @@ _histcmd_activate_context_with_parent() {
     HISTSIZE="$_HISTCMD_HISTSIZE"
     SAVEHIST="$_HISTCMD_SAVEHIST"
 
-    fc -RI "$parent_histfile"
+    for source_context in "${source_contexts[@]}"; do
+        [[ "$source_context" == "$context" ]] && continue
+
+        fc -RI "$source_context/histfile"
+    done
+
     fc -RI "$histfile"
 
     _HISTCMD_HISTORY_PUSHED=1
@@ -364,6 +408,10 @@ _histcmd_activate_context_with_parent() {
     _HISTCMD_WRITE_HISTFILE="$histfile"
     _HISTCMD_MODE="context"
     _HISTCMD_ACTIVE_CONTEXT="$context"
+}
+
+_histcmd_activate_context_with_parent() {
+    _histcmd_activate_context_with_sources "$1" "$2"
 }
 
 _histcmd_activate_empty() {
@@ -444,6 +492,21 @@ _histcmd_update_history_context() {
     elif [[ ! -f "$context/histfile" ]]; then
         print -u2 -r -- "histcmd: context histfile is not a regular file: $context/histfile"
         return 1
+    fi
+
+    if _histcmd_context_includes_ancestors "$context"; then
+        local ancestor_output
+        local -a ancestors
+
+        ancestor_output="$(_histcmd_find_ancestor_contexts "$context")" || {
+            _histcmd_activate_context "$context"
+            return $?
+        }
+
+        ancestors=("${(@f)ancestor_output}")
+
+        _histcmd_activate_context_with_sources "$context" "${ancestors[@]}"
+        return $?
     fi
 
     if _histcmd_context_includes_parent "$context"; then

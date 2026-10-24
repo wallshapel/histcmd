@@ -36,6 +36,7 @@ recursive = true
 path = "frontend/frontend-1"
 recursive = true
 include-parent = true
+include-ancestors = true
 
 [[context]]
 path = "1. Recorrido intensivo por C++ y su biblioteca estándar"
@@ -131,6 +132,42 @@ EOF
     When call _histcmd_find_parent_context "$context"
 
     The output should equal "$TEST_WORKSPACE/frontend"
+    The status should be success
+  End
+
+  It 'detects include-ancestors on a context'
+    cd "$TEST_WORKSPACE/frontend/frontend-1/src"
+
+    context="$(_histcmd_resolve_context)"
+
+    When call _histcmd_context_includes_ancestors "$context"
+
+    The status should be success
+  End
+
+  It 'lists configured ancestors from root to immediate parent'
+    cd "$TEST_WORKSPACE/frontend/frontend-1/src"
+
+    context="$(_histcmd_resolve_context)"
+
+    When call _histcmd_find_ancestor_contexts "$context"
+
+    The output should equal "$TEST_WORKSPACE"$'\n'"$TEST_WORKSPACE/frontend"
+    The status should be success
+  End
+
+  It 'activates all ancestors without duplicating the immediate parent'
+    ACTIVATION_LOG="$TEST_WORKSPACE/activation.log"
+
+    _histcmd_activate_context_with_sources() {
+      printf '%s\n' "$@" > "$ACTIVATION_LOG"
+    }
+
+    cd "$TEST_WORKSPACE/frontend/frontend-1/src"
+
+    When run command cat "$ACTIVATION_LOG"
+
+    The output should equal "$TEST_WORKSPACE/frontend/frontend-1"$'\n'"$TEST_WORKSPACE"$'\n'"$TEST_WORKSPACE/frontend"
     The status should be success
   End
 
