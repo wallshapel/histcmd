@@ -276,4 +276,82 @@ EOF
     The status should be failure
   End
 
+  It 'accepts include-descendants in valid contexts'
+    mkdir -p "$TEST_WORKSPACE/backend/api"
+
+    cat > "$TEST_WORKSPACE/histmap.toml" <<'EOF'
+version = 1
+
+[[context]]
+path = "."
+recursive = false
+include-descendants = true
+
+[[context]]
+path = "backend"
+recursive = true
+include-descendants = false
+
+[[context]]
+path = "backend/api"
+recursive = true
+EOF
+
+    cd "$TEST_WORKSPACE"
+
+    When run command zsh "$PROJECT_ROOT/bin/histcmd" build
+
+    The output should include 'Created histfile'
+    The output should include 'Created backend/histfile'
+    The output should include 'Created backend/api/histfile'
+
+    The path "$TEST_WORKSPACE/histfile" should be file
+    The path "$TEST_WORKSPACE/backend/histfile" should be file
+    The path "$TEST_WORKSPACE/backend/api/histfile" should be file
+    The status should be success
+  End
+
+  It 'rejects invalid include-descendants values'
+    mkdir -p "$TEST_WORKSPACE/backend"
+
+    cat > "$TEST_WORKSPACE/histmap.toml" <<'EOF'
+version = 1
+
+[[context]]
+path = "backend"
+recursive = true
+include-descendants = maybe
+EOF
+
+    cd "$TEST_WORKSPACE"
+
+    When run command zsh "$PROJECT_ROOT/bin/histcmd" build
+
+    The path "$TEST_WORKSPACE/backend/histfile" should not be exist
+    The stderr should include 'invalid syntax'
+    The status should be failure
+  End
+
+  It 'rejects duplicate include-descendants declarations'
+    mkdir -p "$TEST_WORKSPACE/backend"
+
+    cat > "$TEST_WORKSPACE/histmap.toml" <<'EOF'
+version = 1
+
+[[context]]
+path = "backend"
+recursive = true
+include-descendants = true
+include-descendants = false
+EOF
+
+    cd "$TEST_WORKSPACE"
+
+    When run command zsh "$PROJECT_ROOT/bin/histcmd" build
+
+    The path "$TEST_WORKSPACE/backend/histfile" should not be exist
+    The stderr should include 'duplicate include-descendants'
+    The status should be failure
+  End
+
 End

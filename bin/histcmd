@@ -47,6 +47,7 @@ _histcmd_build() {
     local include_parent_re='^[[:space:]]*include-parent[[:space:]]*=[[:space:]]*(true|false)[[:space:]]*$'
     local include_ancestors_re='^[[:space:]]*include-ancestors[[:space:]]*=[[:space:]]*(true|false)[[:space:]]*$'
     local include_children_re='^[[:space:]]*include-children[[:space:]]*=[[:space:]]*(true|false)[[:space:]]*$'
+    local include_descendants_re='^[[:space:]]*include-descendants[[:space:]]*=[[:space:]]*(true|false)[[:space:]]*$'
 
     local -a context_paths
     local current_path=""
@@ -54,6 +55,7 @@ _histcmd_build() {
     local current_include_parent=""
     local current_include_ancestors=""
     local current_include_children=""
+    local current_include_descendants=""
     local line
     local line_number=0
     local version_found=0
@@ -90,6 +92,7 @@ _histcmd_build() {
             current_include_parent=""
             current_include_ancestors=""
             current_include_children=""
+            current_include_descendants=""
             inside_context=1
             continue
         fi
@@ -141,6 +144,16 @@ _histcmd_build() {
             fi
 
             current_include_children="$match[1]"
+            continue
+        fi
+
+        if (( inside_context )) && [[ "$line" =~ "$include_descendants_re" ]]; then
+            if [[ -n "$current_include_descendants" ]]; then
+                print -u2 -r -- "histcmd: duplicate include-descendants at line $line_number"
+                return 1
+            fi
+
+            current_include_descendants="$match[1]"
             continue
         fi
 

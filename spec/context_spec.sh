@@ -283,4 +283,131 @@ EOF
     The status should be success
   End
 
+  It 'finds all configured descendants at any depth'
+    mkdir -p \
+      "$TEST_WORKSPACE/backend/api/v1" \
+      "$TEST_WORKSPACE/backend/tools"
+
+    cat >> "$TEST_WORKSPACE/histmap.toml" <<'EOF'
+
+[[context]]
+path = "backend/api"
+recursive = true
+
+[[context]]
+path = "backend/api/v1"
+recursive = true
+
+[[context]]
+path = "backend/tools"
+recursive = true
+EOF
+
+    cd "$TEST_WORKSPACE/backend"
+
+    When call _histcmd_find_descendant_contexts "$TEST_WORKSPACE/backend"
+
+    The output should equal "$TEST_WORKSPACE/backend/api"$'\n'"$TEST_WORKSPACE/backend/api/v1"$'\n'"$TEST_WORKSPACE/backend/tools"
+    The status should be success
+  End
+
+  It 'returns no descendants for a leaf context'
+    cd "$TEST_WORKSPACE/frontend/frontend-1/src"
+
+    When call _histcmd_find_descendant_contexts "$TEST_WORKSPACE/frontend/frontend-1"
+
+    The output should equal ''
+    The status should be failure
+  End
+
+  It 'activates all descendants without duplicating immediate children'
+    ACTIVATION_LOG="$TEST_WORKSPACE/activation.log"
+
+    mkdir -p \
+      "$TEST_WORKSPACE/backend/api/v1" \
+      "$TEST_WORKSPACE/frontend"
+
+    cat > "$TEST_WORKSPACE/histmap.toml" <<'EOF'
+version = 1
+
+[[context]]
+path = "."
+recursive = false
+include-children = true
+include-descendants = true
+
+[[context]]
+path = "backend"
+recursive = true
+
+[[context]]
+path = "backend/api"
+recursive = true
+
+[[context]]
+path = "backend/api/v1"
+recursive = true
+
+[[context]]
+path = "frontend"
+recursive = true
+EOF
+
+    _histcmd_activate_context_with_sources() {
+      printf '%s\n' "$@" > "$ACTIVATION_LOG"
+    }
+
+    cd "$TEST_WORKSPACE"
+
+    When run command cat "$ACTIVATION_LOG"
+
+    The output should equal "$TEST_WORKSPACE"$'\n'"$TEST_WORKSPACE/backend"$'\n'"$TEST_WORKSPACE/backend/api"$'\n'"$TEST_WORKSPACE/backend/api/v1"$'\n'"$TEST_WORKSPACE/frontend"
+    The status should be success
+  End
+
+  It 'combines ancestors and descendants without including unrelated contexts'
+    ACTIVATION_LOG="$TEST_WORKSPACE/activation.log"
+
+    mkdir -p \
+      "$TEST_WORKSPACE/backend/api/v1" \
+      "$TEST_WORKSPACE/frontend"
+
+    cat > "$TEST_WORKSPACE/histmap.toml" <<'EOF'
+version = 1
+
+[[context]]
+path = "."
+recursive = false
+
+[[context]]
+path = "backend"
+recursive = true
+include-ancestors = true
+include-descendants = true
+
+[[context]]
+path = "backend/api"
+recursive = true
+
+[[context]]
+path = "backend/api/v1"
+recursive = true
+
+[[context]]
+path = "frontend"
+recursive = true
+EOF
+
+    _histcmd_activate_context_with_sources() {
+      printf '%s\n' "$@" > "$ACTIVATION_LOG"
+    }
+
+    cd "$TEST_WORKSPACE/backend"
+
+    When run command cat "$ACTIVATION_LOG"
+
+    The output should equal "$TEST_WORKSPACE/backend"$'\n'"$TEST_WORKSPACE"$'\n'"$TEST_WORKSPACE/backend/api"$'\n'"$TEST_WORKSPACE/backend/api/v1"
+    The status should be success
+  End
+
 End
