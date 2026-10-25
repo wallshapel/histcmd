@@ -106,7 +106,7 @@ _histcmd_context_flag_enabled() {
     local context="$1"
     local flag="$2"
 
-    [[ "$flag" == "include-parent" || "$flag" == "include-ancestors" ]] || return 1
+    [[ "$flag" == "include-parent" || "$flag" == "include-ancestors" || "$flag" == "include-children" ]] || return 1
 
     local workspace
     workspace="$(_histcmd_find_workspace)" || return 1
@@ -166,6 +166,10 @@ _histcmd_context_includes_ancestors() {
     _histcmd_context_flag_enabled "$1" "include-ancestors"
 }
 
+_histcmd_context_includes_children() {
+    _histcmd_context_flag_enabled "$1" "include-children"
+}
+
 _histcmd_find_parent_context() {
     emulate -L zsh
 
@@ -221,6 +225,45 @@ _histcmd_find_ancestor_contexts() {
     (( ${#ancestors[@]} > 0 )) || return 1
 
     printf '%s\n' "${ancestors[@]}"
+}
+
+_histcmd_find_child_contexts() {
+    emulate -L zsh
+
+    local context="$1"
+    local workspace
+    workspace="$(_histcmd_find_workspace)" || return 1
+
+    local histmap="$workspace/histmap.toml"
+    local path_re='^[[:space:]]*path[[:space:]]*=[[:space:]]*"([^"]*)"[[:space:]]*$'
+
+    local line
+    local candidate
+    local parent
+    local -a children
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        [[ "$line" =~ "$path_re" ]] || continue
+
+        candidate="${workspace}/${match[1]}"
+        candidate="${candidate:A}"
+
+        if [[ "$candidate" != "$workspace" && "$candidate" != "$workspace"/* ]]; then
+            continue
+        fi
+
+        [[ "$candidate" == "$context"/* ]] || continue
+
+        parent="$(_histcmd_find_parent_context "$candidate")" || continue
+
+        if [[ "$parent" == "$context" ]]; then
+            children+=("$candidate")
+        fi
+    done < "$histmap"
+
+    (( ${#children[@]} > 0 )) || return 1
+
+    printf '%s\n' "${children[@]}"
 }
 
 typeset -g _HISTCMD_MODE="global"
@@ -494,34 +537,34 @@ _histcmd_update_history_context() {
         return 1
     fi
 
+    local -a sources
+    local source_output
+    local parent
+
     if _histcmd_context_includes_ancestors "$context"; then
-        local ancestor_output
-        local -a ancestors
+        source_output="$(_histcmd_find_ancestor_contexts "$context")" || source_output=""
 
-        ancestor_output="$(_histcmd_find_ancestor_contexts "$context")" || {
-            _histcmd_activate_context "$context"
-            return $?
-        }
+        if [[ -n "$source_output" ]]; then
+            sources+=("${(@f)source_output}")
+        fi
 
-        ancestors=("${(@f)ancestor_output}")
-
-        _histcmd_activate_context_with_sources "$context" "${ancestors[@]}"
-        return $?
+    elif _histcmd_context_includes_parent "$context"; then
+        parent="$(_histcmd_find_parent_context "$context")" && sources+=("$parent")
     fi
 
-    if _histcmd_context_includes_parent "$context"; then
-        local parent
+    if _histcmd_context_includes_children "$context"; then
+        source_output="$(_histcmd_find_child_contexts "$context")" || source_output=""
 
-        parent="$(_histcmd_find_parent_context "$context")" || {
-            _histcmd_activate_context "$context"
-            return $?
-        }
-
-        _histcmd_activate_context_with_parent "$context" "$parent"
-        return $?
+        if [[ -n "$source_output" ]]; then
+            sources+=("${(@f)source_output}")
+        fi
     fi
 
-    _histcmd_activate_context "$context"
+    if (( ${#sources[@]} > 0 )); then
+        _histcmd_activate_context_with_sources "$context" "${sources[@]}"
+    else
+        _histcmd_activate_context "$context"
+    fi
 }
 
 _histcmd_on_exit() {

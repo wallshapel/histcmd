@@ -171,4 +171,116 @@ EOF
     The status should be success
   End
 
+  It 'finds immediate configured children without including grandchildren'
+    mkdir -p \
+      "$TEST_WORKSPACE/frontend/frontend-1/deeper" \
+      "$TEST_WORKSPACE/frontend/components/buttons"
+
+    cat >> "$TEST_WORKSPACE/histmap.toml" <<'EOF'
+
+[[context]]
+path = "frontend/frontend-1/deeper"
+recursive = true
+
+[[context]]
+path = "frontend/components/buttons"
+recursive = true
+EOF
+
+    cd "$TEST_WORKSPACE/frontend"
+
+    When call _histcmd_find_child_contexts "$TEST_WORKSPACE/frontend"
+
+    The output should equal "$TEST_WORKSPACE/frontend/frontend-1"$'\n'"$TEST_WORKSPACE/frontend/components/buttons"
+    The status should be success
+  End
+
+  It 'returns no children when a context has no configured descendants'
+    cd "$TEST_WORKSPACE/frontend/frontend-1/src"
+
+    When call _histcmd_find_child_contexts "$TEST_WORKSPACE/frontend/frontend-1"
+
+    The output should equal ''
+    The status should be failure
+  End
+
+  It 'activates immediate children without including grandchildren'
+    ACTIVATION_LOG="$TEST_WORKSPACE/activation.log"
+
+    mkdir -p \
+      "$TEST_WORKSPACE/backend/api" \
+      "$TEST_WORKSPACE/frontend"
+
+    cat > "$TEST_WORKSPACE/histmap.toml" <<'EOF'
+version = 1
+
+[[context]]
+path = "."
+recursive = false
+include-children = true
+
+[[context]]
+path = "backend"
+recursive = true
+
+[[context]]
+path = "backend/api"
+recursive = true
+
+[[context]]
+path = "frontend"
+recursive = true
+EOF
+
+    _histcmd_activate_context_with_sources() {
+      printf '%s\n' "$@" > "$ACTIVATION_LOG"
+    }
+
+    cd "$TEST_WORKSPACE"
+
+    When run command cat "$ACTIVATION_LOG"
+
+    The output should equal "$TEST_WORKSPACE"$'\n'"$TEST_WORKSPACE/backend"$'\n'"$TEST_WORKSPACE/frontend"
+    The status should be success
+  End
+
+  It 'combines parent and children without including grandchildren'
+    ACTIVATION_LOG="$TEST_WORKSPACE/activation.log"
+
+    mkdir -p "$TEST_WORKSPACE/backend/api/deeper"
+
+    cat > "$TEST_WORKSPACE/histmap.toml" <<'EOF'
+version = 1
+
+[[context]]
+path = "."
+recursive = false
+
+[[context]]
+path = "backend"
+recursive = true
+include-parent = true
+include-children = true
+
+[[context]]
+path = "backend/api"
+recursive = true
+
+[[context]]
+path = "backend/api/deeper"
+recursive = true
+EOF
+
+    _histcmd_activate_context_with_sources() {
+      printf '%s\n' "$@" > "$ACTIVATION_LOG"
+    }
+
+    cd "$TEST_WORKSPACE/backend"
+
+    When run command cat "$ACTIVATION_LOG"
+
+    The output should equal "$TEST_WORKSPACE/backend"$'\n'"$TEST_WORKSPACE"$'\n'"$TEST_WORKSPACE/backend/api"
+    The status should be success
+  End
+
 End

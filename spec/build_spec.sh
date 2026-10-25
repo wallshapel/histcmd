@@ -198,4 +198,82 @@ EOF
     The status should be failure
   End
 
+  It 'accepts include-children in valid contexts'
+    mkdir -p "$TEST_WORKSPACE/backend/api"
+
+    cat > "$TEST_WORKSPACE/histmap.toml" <<'EOF'
+version = 1
+
+[[context]]
+path = "."
+recursive = false
+include-children = true
+
+[[context]]
+path = "backend"
+recursive = true
+include-children = false
+
+[[context]]
+path = "backend/api"
+recursive = true
+EOF
+
+    cd "$TEST_WORKSPACE"
+
+    When run command zsh "$PROJECT_ROOT/bin/histcmd" build
+
+    The output should include 'Created histfile'
+    The output should include 'Created backend/histfile'
+    The output should include 'Created backend/api/histfile'
+
+    The path "$TEST_WORKSPACE/histfile" should be file
+    The path "$TEST_WORKSPACE/backend/histfile" should be file
+    The path "$TEST_WORKSPACE/backend/api/histfile" should be file
+    The status should be success
+  End
+
+  It 'rejects invalid include-children values'
+    mkdir -p "$TEST_WORKSPACE/backend"
+
+    cat > "$TEST_WORKSPACE/histmap.toml" <<'EOF'
+version = 1
+
+[[context]]
+path = "backend"
+recursive = true
+include-children = maybe
+EOF
+
+    cd "$TEST_WORKSPACE"
+
+    When run command zsh "$PROJECT_ROOT/bin/histcmd" build
+
+    The path "$TEST_WORKSPACE/backend/histfile" should not be exist
+    The stderr should include 'invalid syntax'
+    The status should be failure
+  End
+
+  It 'rejects duplicate include-children declarations'
+    mkdir -p "$TEST_WORKSPACE/backend"
+
+    cat > "$TEST_WORKSPACE/histmap.toml" <<'EOF'
+version = 1
+
+[[context]]
+path = "backend"
+recursive = true
+include-children = true
+include-children = false
+EOF
+
+    cd "$TEST_WORKSPACE"
+
+    When run command zsh "$PROJECT_ROOT/bin/histcmd" build
+
+    The path "$TEST_WORKSPACE/backend/histfile" should not be exist
+    The stderr should include 'duplicate include-children'
+    The status should be failure
+  End
+
 End
